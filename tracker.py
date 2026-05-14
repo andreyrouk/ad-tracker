@@ -44,7 +44,7 @@ def fetch_ads(page_id, page_name):
             "title": title,
             "cta": cta,
             "link_url": link_url,
-            "started": ad.get("ad_delivery_start_time", ""),
+            "started": ad.get("start_date", ""),
         })
     return results
 
