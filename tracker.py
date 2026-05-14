@@ -37,43 +37,10 @@ def fetch_ads(page_id, page_name):
         print(f"Found {len(ad_cards)} ad cards")
 
         for card in ad_cards:
-            try:
-                # Ad ID from the "Library ID" text
-                ad_id = ""
-                id_el = card.query_selector("span:has-text('Library ID')")
-                if id_el:
-                    ad_id = id_el.inner_text().replace("Library ID:", "").strip()
-
-                if not ad_id or ad_id in seen_ids:
-                    continue
-                seen_ids.add(ad_id)
-
-                # Ad text
-                ad_text = ""
-                text_el = card.query_selector("div[class*='_4ik4'] span")
-                if text_el:
-                    ad_text = text_el.inner_text()[:300]
-
-                # Started date
-                started = ""
-                date_el = card.query_selector("span:has-text('Started running')")
-                if date_el:
-                    started = date_el.inner_text().replace("Started running on", "").strip()
-
-                results.append({
-                    "ad_id": ad_id,
-                    "competitor": page_name,
-                    "date_seen": datetime.today().strftime("%Y-%m-%d"),
-                    "ad_text": ad_text,
-                    "title": "",
-                    "cta": "",
-                    "link_url": "",
-                    "started": started,
-                })
-
-            except Exception as e:
-                print(f"Error parsing card: {e}")
-                continue
+            # Dump HTML of first card to inspect structure
+            if ad_cards:
+                print("FIRST CARD HTML:")
+                print(ad_cards[0].inner_html()[:3000])
 
         browser.close()
 
