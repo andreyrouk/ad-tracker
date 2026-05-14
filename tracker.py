@@ -27,19 +27,23 @@ def fetch_ads(page_id, page_name):
     }
     response = requests.get(url, params=params)
     data = response.json()
-    print(f"Raw response: {json.dumps(data, indent=2)[:3000]}")
     ads = data.get("ads", [])
-    if ads:
-        print(f"First ad sample: {json.dumps(ads[0], indent=2)}")
     results = []
     for ad in ads:
+        snapshot = ad.get("snapshot", {})
+        cards = snapshot.get("cards", [])
+        ad_text = cards[0].get("body", "") if cards else ""
+        title = cards[0].get("title", "") if cards else ""
+        link_url = cards[0].get("link_url", "") if cards else ""
+        cta = snapshot.get("cta_text", "")
         results.append({
+            "ad_id": ad.get("ad_archive_id", ""),
             "competitor": page_name,
-            "ad_id": ad.get("id", ""),
             "date_seen": datetime.today().strftime("%Y-%m-%d"),
-            "platforms": ", ".join(ad.get("publisher_platforms", [])),
-            "ad_text": ad.get("ad_snapshot_url", "")[:200] if ad.get("body", {}).get("text") else "",
-            "snapshot_url": ad.get("ad_snapshot_url", ""),
+            "ad_text": ad_text[:300],
+            "title": title,
+            "cta": cta,
+            "link_url": link_url,
             "started": ad.get("ad_delivery_start_time", ""),
         })
     return results
@@ -59,9 +63,10 @@ def write_to_sheet(rows):
                 row["ad_id"],
                 row["competitor"],
                 row["date_seen"],
-                row["platforms"],
                 row["ad_text"],
-                row["snapshot_url"],
+                row["title"],
+                row["cta"],
+                row["link_url"],
                 row["started"],
             ])
             new_rows += 1
