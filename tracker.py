@@ -1,86 +1,84 @@
-import requests
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 import json
 from datetime import datetime
+from playwright.sync_api import sync_playwright
+import time
 
 # Config
-SEARCHAPI_KEY = os.environ["SEARCHAPI_KEY"]
 GOOGLE_CREDS = json.loads(os.environ["GOOGLE_CREDS"])
+SHEET_NAME = "Ad Tracker"
 
 COMPETITORS = {
     "LegalZoom": "96270063170",
 }
 
-SHEET_NAME = "Ad Tracker"
-
 def fetch_ads(page_id, page_name):
-    url = "https://www.searchapi.io/api/v1/search"
-    all_results = []
+    results = []
     seen_ids = set()
-    next_token = None
 
-    while True:
-        payload = {
-            "engine": "meta_ad_library",
-            "page_id": page_id,
-            "ad_type": "all",
-            "active_status": "active",
-            "country": "US",
-            "api_key": SEARCHAPI_KEY,
-        }
-        if next_token:
-            payload["next_page_token"] = next_token
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
 
-        response = requests.post(url, json=payload)
-        data = response.json()
-        
-        print(f"Status code: {response.status_code}")
-        print(f"Raw response: {json.dumps(data, indent=2)[:500]}")
-        
-        ads = data.get("ads", [])
+        url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id={page_id}"
+        print(f"Loading {url}")
+        page.goto(url, wait_until="networkidle", timeout=60000)
+        time.sleep(3)
 
-        if not ads:
-            print("No ads returned, stopping.")
-            break
+        # Scroll to load ads
+        for _ in range(10):
+            page.keyboard.press("End")
+            time.sleep(2)
 
-        new_this_page = 0
-        for ad in ads:
-            ad_id = ad.get("ad_archive_id", "")
-            if ad_id in seen_ids:
+        # Extract ad cards
+        ad_cards = page.query_selector_all("div[class*='x1dr75xp']")
+        print(f"Found {len(ad_cards)} ad cards")
+
+        for card in ad_cards:
+            try:
+                # Ad ID from the "Library ID" text
+                ad_id = ""
+                id_el = card.query_selector("span:has-text('Library ID')")
+                if id_el:
+                    ad_id = id_el.inner_text().replace("Library ID:", "").strip()
+
+                if not ad_id or ad_id in seen_ids:
+                    continue
+                seen_ids.add(ad_id)
+
+                # Ad text
+                ad_text = ""
+                text_el = card.query_selector("div[class*='_4ik4'] span")
+                if text_el:
+                    ad_text = text_el.inner_text()[:300]
+
+                # Started date
+                started = ""
+                date_el = card.query_selector("span:has-text('Started running')")
+                if date_el:
+                    started = date_el.inner_text().replace("Started running on", "").strip()
+
+                results.append({
+                    "ad_id": ad_id,
+                    "competitor": page_name,
+                    "date_seen": datetime.today().strftime("%Y-%m-%d"),
+                    "ad_text": ad_text,
+                    "title": "",
+                    "cta": "",
+                    "link_url": "",
+                    "started": started,
+                })
+
+            except Exception as e:
+                print(f"Error parsing card: {e}")
                 continue
-            seen_ids.add(ad_id)
-            new_this_page += 1
-            snapshot = ad.get("snapshot", {})
-            cards = snapshot.get("cards", [])
-            ad_text = cards[0].get("body", "") if cards else ""
-            title = cards[0].get("title", "") if cards else ""
-            link_url = cards[0].get("link_url", "") if cards else ""
-            cta = snapshot.get("cta_text", "")
-            all_results.append({
-                "ad_id": ad_id,
-                "competitor": page_name,
-                "date_seen": datetime.today().strftime("%Y-%m-%d"),
-                "ad_text": ad_text[:300],
-                "title": title,
-                "cta": cta,
-                "link_url": link_url,
-                "started": ad.get("start_date", ""),
-            })
 
-        print(f"Fetched {len(ads)} ads, {new_this_page} new unique. Total: {len(all_results)}")
+        browser.close()
 
-        if new_this_page == 0:
-            print("No new unique ads, stopping.")
-            break
-
-        next_token = data.get("pagination", {}).get("next_page_token")
-        if not next_token:
-            print("No more pages.")
-            break
-
-    return all_results
+    print(f"Total unique ads: {len(results)}")
+    return results
 
 def write_to_sheet(rows):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -114,6 +112,5 @@ if __name__ == "__main__":
     for name, page_id in COMPETITORS.items():
         print(f"Fetching {name}...")
         ads = fetch_ads(page_id, name)
-        print(f"Found {len(ads)} active ads.")
         all_ads.extend(ads)
     write_to_sheet(all_ads)
