@@ -17,36 +17,52 @@ SHEET_NAME = "Ad Tracker"
 
 def fetch_ads(page_id, page_name):
     url = "https://www.searchapi.io/api/v1/search"
-    params = {
-        "engine": "meta_ad_library",
-        "page_id": page_id,
-        "ad_type": "all",
-        "active_status": "active",
-        "country": "US",
-        "api_key": SEARCHAPI_KEY,
-    }
-    response = requests.get(url, params=params)
-    data = response.json()
-    ads = data.get("ads", [])
-    results = []
-    for ad in ads:
-        snapshot = ad.get("snapshot", {})
-        cards = snapshot.get("cards", [])
-        ad_text = cards[0].get("body", "") if cards else ""
-        title = cards[0].get("title", "") if cards else ""
-        link_url = cards[0].get("link_url", "") if cards else ""
-        cta = snapshot.get("cta_text", "")
-        results.append({
-            "ad_id": ad.get("ad_archive_id", ""),
-            "competitor": page_name,
-            "date_seen": datetime.today().strftime("%Y-%m-%d"),
-            "ad_text": ad_text[:300],
-            "title": title,
-            "cta": cta,
-            "link_url": link_url,
-            "started": ad.get("start_date", ""),
-        })
-    return results
+    all_results = []
+    page = 1
+
+    while True:
+        params = {
+            "engine": "meta_ad_library",
+            "page_id": page_id,
+            "ad_type": "all",
+            "active_status": "active",
+            "country": "US",
+            "api_key": SEARCHAPI_KEY,
+            "page": page,
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+        ads = data.get("ads", [])
+
+        if not ads:
+            break
+
+        for ad in ads:
+            snapshot = ad.get("snapshot", {})
+            cards = snapshot.get("cards", [])
+            ad_text = cards[0].get("body", "") if cards else ""
+            title = cards[0].get("title", "") if cards else ""
+            link_url = cards[0].get("link_url", "") if cards else ""
+            cta = snapshot.get("cta_text", "")
+            all_results.append({
+                "ad_id": ad.get("ad_archive_id", ""),
+                "competitor": page_name,
+                "date_seen": datetime.today().strftime("%Y-%m-%d"),
+                "ad_text": ad_text[:300],
+                "title": title,
+                "cta": cta,
+                "link_url": link_url,
+                "started": ad.get("start_date", ""),
+            })
+
+        print(f"Page {page}: fetched {len(ads)} ads")
+
+        if not data.get("pagination", {}).get("next_page"):
+            break
+
+        page += 1
+
+    return all_results
 
 def write_to_sheet(rows):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
