@@ -27,6 +27,7 @@ def fetch_ads(page_id, page_name):
     }
     response = requests.get(url, params=params)
     data = response.json()
+    print(f"Raw response: {json.dumps(data, indent=2)[:2000]}")
     ads = data.get("ads", [])
     results = []
     for ad in ads:
