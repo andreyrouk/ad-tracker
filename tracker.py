@@ -27,6 +27,10 @@ def fetch_ads(page_id, page_name):
         page.goto(url, wait_until="networkidle", timeout=60000)
         time.sleep(3)
 
+        with open("page_dump.html", "w") as f:
+            f.write(page.content())
+        print("Page dumped")
+
         # Scroll to load ads
         for _ in range(10):
             page.keyboard.press("End")
