@@ -2,7 +2,7 @@ name: Daily Ad Tracker
 
 on:
   schedule:
-    - cron: '0 9 * * *'  # Runs every day at 9am UTC
+    - cron: '0 9 * * 1'  # Runs every monday at 9am UTC
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
