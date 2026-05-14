@@ -64,6 +64,10 @@ def fetch_ads(page_id, page_name):
         params["next_page_token"] = next_token
         page += 1
 
+    print(f"Total fetched: {len(all_results)}")
+    unique_ids = set(r["ad_id"] for r in all_results)
+    print(f"Unique ad IDs: {len(unique_ids)}")
+    
     return all_results
 
 def write_to_sheet(rows):
