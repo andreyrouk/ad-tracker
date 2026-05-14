@@ -28,7 +28,6 @@ def fetch_ads(page_id, page_name):
             "active_status": "active",
             "country": "US",
             "api_key": SEARCHAPI_KEY,
-            "page": page,
         }
         response = requests.get(url, params=params)
         data = response.json()
@@ -58,9 +57,11 @@ def fetch_ads(page_id, page_name):
         print(f"Page {page}: fetched {len(ads)} ads")
         print(f"Pagination data: {data.get('pagination')}")
 
-        if not data.get("pagination", {}).get("next_page"):
+        next_token = data.get("pagination", {}).get("next_page_token")
+        if not next_token:
             break
 
+        params["next_page_token"] = next_token
         page += 1
 
     return all_results
