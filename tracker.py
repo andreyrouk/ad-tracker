@@ -72,12 +72,12 @@ def write_to_sheet(rows):
     client = gspread.authorize(creds)
     sheet = client.open(SHEET_NAME).sheet1
 
-    existing = sheet.col_values(1)  # ad_id column
+    existing = set(sheet.col_values(1))
 
-    new_rows = 0
+    new_rows = []
     for row in rows:
         if row["ad_id"] not in existing:
-            sheet.append_row([
+            new_rows.append([
                 row["ad_id"],
                 row["competitor"],
                 row["date_seen"],
@@ -87,9 +87,11 @@ def write_to_sheet(rows):
                 row["link_url"],
                 row["started"],
             ])
-            new_rows += 1
 
-    print(f"Added {new_rows} new ads.")
+    if new_rows:
+        sheet.append_rows(new_rows, value_input_option="RAW")
+
+    print(f"Added {len(new_rows)} new ads.")
 
 if __name__ == "__main__":
     all_ads = []
