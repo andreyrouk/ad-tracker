@@ -18,7 +18,8 @@ SHEET_NAME = "Ad Tracker"
 def fetch_ads(page_id, page_name):
     url = "https://www.searchapi.io/api/v1/search"
     all_results = []
-    page = 1
+    seen_ids = set()
+    next_token = None
 
     while True:
         params = {
@@ -29,14 +30,24 @@ def fetch_ads(page_id, page_name):
             "country": "US",
             "api_key": SEARCHAPI_KEY,
         }
+        if next_token:
+            params["next_page_token"] = next_token
+
         response = requests.get(url, params=params)
         data = response.json()
         ads = data.get("ads", [])
 
         if not ads:
+            print("No ads returned, stopping.")
             break
 
+        new_this_page = 0
         for ad in ads:
+            ad_id = ad.get("ad_archive_id", "")
+            if ad_id in seen_ids:
+                continue
+            seen_ids.add(ad_id)
+            new_this_page += 1
             snapshot = ad.get("snapshot", {})
             cards = snapshot.get("cards", [])
             ad_text = cards[0].get("body", "") if cards else ""
@@ -44,7 +55,7 @@ def fetch_ads(page_id, page_name):
             link_url = cards[0].get("link_url", "") if cards else ""
             cta = snapshot.get("cta_text", "")
             all_results.append({
-                "ad_id": ad.get("ad_archive_id", ""),
+                "ad_id": ad_id,
                 "competitor": page_name,
                 "date_seen": datetime.today().strftime("%Y-%m-%d"),
                 "ad_text": ad_text[:300],
@@ -54,20 +65,18 @@ def fetch_ads(page_id, page_name):
                 "started": ad.get("start_date", ""),
             })
 
-        print(f"Page {page}: fetched {len(ads)} ads")
-        print(f"Pagination data: {data.get('pagination')}")
+        print(f"Page fetched: {len(ads)} ads, {new_this_page} new unique")
+
+        if new_this_page == 0:
+            print("No new unique ads on this page, stopping.")
+            break
 
         next_token = data.get("pagination", {}).get("next_page_token")
         if not next_token:
+            print("No more pages.")
             break
 
-        params["next_page_token"] = next_token
-        page += 1
-
-    print(f"Total fetched: {len(all_results)}")
-    unique_ids = set(r["ad_id"] for r in all_results)
-    print(f"Unique ad IDs: {len(unique_ids)}")
-    
+    print(f"Total unique ads: {len(all_results)}")
     return all_results
 
 def write_to_sheet(rows):
