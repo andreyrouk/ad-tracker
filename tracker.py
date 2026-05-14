@@ -25,7 +25,32 @@ def fetch_ads(page_id, page_name):
         url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id={page_id}"
         print(f"Loading {url}")
         page.goto(url, wait_until="networkidle", timeout=60000)
-        time.sleep(3)
+        
+        # Wait for cookie/consent dialog and dismiss if present
+        try:
+            consent_btn = page.wait_for_selector("button[data-cookiebanner='accept_button']", timeout=5000)
+            if consent_btn:
+                consent_btn.click()
+                time.sleep(2)
+        except:
+            pass
+
+        # Wait for actual ad content to load
+        try:
+            page.wait_for_selector("div[class*='_7jyg']", timeout=30000)
+        except:
+            print("Timeout waiting for ads - dumping what we have")
+
+        time.sleep(5)
+
+        # Scroll to trigger lazy loading
+        for _ in range(15):
+            page.evaluate("window.scrollBy(0, 800)")
+            time.sleep(1.5)
+
+        # Dump HTML after full load
+        print("PAGE HTML AFTER LOAD:")
+        print(page.content()[5000:10000])
 
         print("PAGE HTML SAMPLE:")
         print(page.content()[:5000])
