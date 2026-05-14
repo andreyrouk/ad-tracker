@@ -33,7 +33,11 @@ def fetch_ads(page_id, page_name):
             time.sleep(2)
 
         # Extract ad cards
-        ad_cards = page.query_selector_all("div[class*='x1dr75xp']")
+        ad_cards = page.query_selector_all("div[data-testid='ad-archive-preview-card']")
+        if not ad_cards:
+            ad_cards = page.query_selector_all("div._7jyg")
+        if not ad_cards:
+            ad_cards = page.query_selector_all("div[class*='_8n_p']")
         print(f"Found {len(ad_cards)} ad cards")
 
         for card in ad_cards:
