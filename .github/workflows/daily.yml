@@ -1,0 +1,28 @@
+name: Daily Ad Tracker
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # Runs every day at 9am UTC
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  run-tracker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tracker
+        env:
+          SEARCHAPI_KEY: ${{ secrets.SEARCHAPI_KEY }}
+          GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
+        run: python tracker.py
