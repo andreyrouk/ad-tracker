@@ -22,7 +22,7 @@ def fetch_ads(page_id, page_name):
     next_token = None
 
     while True:
-        params = {
+        payload = {
             "engine": "meta_ad_library",
             "page_id": page_id,
             "ad_type": "all",
@@ -31,9 +31,9 @@ def fetch_ads(page_id, page_name):
             "api_key": SEARCHAPI_KEY,
         }
         if next_token:
-            params["next_page_token"] = next_token
+            payload["next_page_token"] = next_token
 
-        response = requests.get(url, params=params)
+        response = requests.post(url, json=payload)
         data = response.json()
         ads = data.get("ads", [])
 
@@ -65,10 +65,10 @@ def fetch_ads(page_id, page_name):
                 "started": ad.get("start_date", ""),
             })
 
-        print(f"Page fetched: {len(ads)} ads, {new_this_page} new unique")
+        print(f"Fetched {len(ads)} ads, {new_this_page} new unique. Total: {len(all_results)}")
 
         if new_this_page == 0:
-            print("No new unique ads on this page, stopping.")
+            print("No new unique ads, stopping.")
             break
 
         next_token = data.get("pagination", {}).get("next_page_token")
@@ -76,7 +76,6 @@ def fetch_ads(page_id, page_name):
             print("No more pages.")
             break
 
-    print(f"Total unique ads: {len(all_results)}")
     return all_results
 
 def write_to_sheet(rows):
