@@ -2,8 +2,8 @@ name: Daily Ad Tracker
 
 on:
   schedule:
-    - cron: '0 9 * * 1'  # Runs every monday at 9am UTC
-  workflow_dispatch:  # Allows manual trigger
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
 
 jobs:
   run-tracker:
@@ -21,8 +21,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Install Playwright browsers
+        run: playwright install chromium
+
       - name: Run tracker
         env:
-          SEARCHAPI_KEY: ${{ secrets.SEARCHAPI_KEY }}
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
         run: python tracker.py
