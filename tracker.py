@@ -56,6 +56,7 @@ def fetch_ads(page_id, page_name):
             })
 
         print(f"Page {page}: fetched {len(ads)} ads")
+        print(f"Pagination data: {data.get('pagination')}")
 
         if not data.get("pagination", {}).get("next_page"):
             break
