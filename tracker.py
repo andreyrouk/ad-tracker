@@ -35,6 +35,10 @@ def fetch_ads(page_id, page_name):
 
         response = requests.post(url, json=payload)
         data = response.json()
+        
+        print(f"Status code: {response.status_code}")
+        print(f"Raw response: {json.dumps(data, indent=2)[:500]}")
+        
         ads = data.get("ads", [])
 
         if not ads:
