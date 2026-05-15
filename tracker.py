@@ -2,11 +2,12 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 import json
-from datetime import datetime
-from playwright.sync_api import sync_playwright
+import requests
 import time
+from datetime import datetime
 
 # Config
+APIFY_TOKEN = os.environ["APIFY_TOKEN"]
 GOOGLE_CREDS = json.loads(os.environ["GOOGLE_CREDS"])
 SHEET_NAME = "Ad Tracker"
 
@@ -15,66 +16,68 @@ COMPETITORS = {
 }
 
 def fetch_ads(page_id, page_name):
+    print(f"Starting Apify run for {page_name}...")
+
+    # Start the actor run
+    run_url = f"https://api.apify.com/v2/acts/api_creators~facebook-ads-library-scraper-api/runs"
+    headers = {"Authorization": f"Bearer {APIFY_TOKEN}"}
+    payload = {
+        "pageId": page_id,
+        "country": "US",
+        "adActiveStatus": "ACTIVE",
+        "maxResults": 150,
+    }
+
+    run_response = requests.post(run_url, json=payload, headers=headers)
+    run_data = run_response.json()
+    print(f"Run response: {json.dumps(run_data, indent=2)[:500]}")
+
+    run_id = run_data.get("data", {}).get("id")
+    if not run_id:
+        print("Failed to start run.")
+        return []
+
+    # Wait for run to finish
+    print(f"Run started: {run_id}. Waiting for completion...")
+    status_url = f"https://api.apify.com/v2/acts/api_creators~facebook-ads-library-scraper-api/runs/{run_id}"
+    for _ in range(24):  # wait up to 2 minutes
+        time.sleep(5)
+        status_response = requests.get(status_url, headers=headers)
+        status = status_response.json().get("data", {}).get("status")
+        print(f"Status: {status}")
+        if status == "SUCCEEDED":
+            break
+        if status in ["FAILED", "ABORTED", "TIMED-OUT"]:
+            print(f"Run failed with status: {status}")
+            return []
+
+    # Get results from dataset
+    dataset_id = run_response.json().get("data", {}).get("defaultDatasetId")
+    results_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items"
+    results_response = requests.get(results_url, headers=headers)
+    items = results_response.json()
+
+    print(f"Raw first item: {json.dumps(items[0], indent=2)[:1000] if items else 'No items'}")
+
     results = []
     seen_ids = set()
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+    for item in items:
+        ad_id = str(item.get("adArchiveId", item.get("id", "")))
+        if not ad_id or ad_id in seen_ids:
+            continue
+        seen_ids.add(ad_id)
 
-        url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id={page_id}"
-        print(f"Loading {url}")
-        page.goto(url, wait_until="networkidle", timeout=60000)
-        
-        # Wait for cookie/consent dialog and dismiss if present
-        try:
-            consent_btn = page.wait_for_selector("button[data-cookiebanner='accept_button']", timeout=5000)
-            if consent_btn:
-                consent_btn.click()
-                time.sleep(2)
-        except:
-            pass
-
-        # Wait for actual ad content to load
-        try:
-            page.wait_for_selector("div[class*='_7jyg']", timeout=30000)
-        except:
-            print("Timeout waiting for ads - dumping what we have")
-
-        time.sleep(5)
-
-        # Scroll to trigger lazy loading
-        for _ in range(15):
-            page.evaluate("window.scrollBy(0, 800)")
-            time.sleep(1.5)
-
-        # Dump HTML after full load
-        print("PAGE HTML AFTER LOAD:")
-        print(page.content()[5000:10000])
-
-        print("PAGE HTML SAMPLE:")
-        print(page.content()[:5000])
-
-        # Scroll to load ads
-        for _ in range(10):
-            page.keyboard.press("End")
-            time.sleep(2)
-
-        # Extract ad cards
-        ad_cards = page.query_selector_all("div[data-testid='ad-archive-preview-card']")
-        if not ad_cards:
-            ad_cards = page.query_selector_all("div._7jyg")
-        if not ad_cards:
-            ad_cards = page.query_selector_all("div[class*='_8n_p']")
-        print(f"Found {len(ad_cards)} ad cards")
-
-        for card in ad_cards:
-            # Dump HTML of first card to inspect structure
-            if ad_cards:
-                print("FIRST CARD HTML:")
-                print(ad_cards[0].inner_html()[:3000])
-
-        browser.close()
+        results.append({
+            "ad_id": ad_id,
+            "competitor": page_name,
+            "date_seen": datetime.today().strftime("%Y-%m-%d"),
+            "ad_text": str(item.get("adText", item.get("body", "")))[:300],
+            "title": str(item.get("title", "")),
+            "cta": str(item.get("ctaText", item.get("cta", ""))),
+            "link_url": str(item.get("linkUrl", item.get("url", ""))),
+            "started": str(item.get("startDate", item.get("adDeliveryStartTime", ""))),
+        })
 
     print(f"Total unique ads: {len(results)}")
     return results
