@@ -64,7 +64,7 @@ def fetch_ads(page_id, page_name):
     results = []
     seen_ids = set()
 
-     for item in items:
+    for item in items:
         ad_id = str(item.get("ad_archive_id", ""))
         if not ad_id or ad_id in seen_ids:
             continue
