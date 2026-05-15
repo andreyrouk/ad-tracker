@@ -18,8 +18,7 @@ COMPETITORS = {
 def fetch_ads(page_id, page_name):
     print(f"Starting Apify run for {page_name}...")
 
-    # Start the actor run
-    run_url = f"https://api.apify.com/v2/acts/api_creators~facebook-ads-library-scraper-api/runs"
+    run_url = "https://api.apify.com/v2/acts/api_creators~facebook-ads-library-scraper-api/runs"
     headers = {"Authorization": f"Bearer {APIFY_TOKEN}"}
     payload = {
         "start_urls": [
@@ -32,17 +31,18 @@ def fetch_ads(page_id, page_name):
 
     run_response = requests.post(run_url, json=payload, headers=headers)
     run_data = run_response.json()
-    print(f"Run response: {json.dumps(run_data, indent=2)[:500]}")
 
     run_id = run_data.get("data", {}).get("id")
+    dataset_id = run_data.get("data", {}).get("defaultDatasetId")
+
     if not run_id:
         print("Failed to start run.")
         return []
 
-    # Wait for run to finish
     print(f"Run started: {run_id}. Waiting for completion...")
     status_url = f"https://api.apify.com/v2/acts/api_creators~facebook-ads-library-scraper-api/runs/{run_id}"
-    for _ in range(24):  # wait up to 2 minutes
+
+    for _ in range(24):
         time.sleep(5)
         status_response = requests.get(status_url, headers=headers)
         status = status_response.json().get("data", {}).get("status")
@@ -53,13 +53,15 @@ def fetch_ads(page_id, page_name):
             print(f"Run failed with status: {status}")
             return []
 
-    # Get results from dataset
-    dataset_id = run_response.json().get("data", {}).get("defaultDatasetId")
     results_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items"
     results_response = requests.get(results_url, headers=headers)
     items = results_response.json()
 
-    print(f"Raw first item: {json.dumps(items[0], indent=2)[:1000] if items else 'No items'}")
+    if not items:
+        print("No items returned.")
+        return []
+
+    print(f"Raw first item: {json.dumps(items[0], indent=2)[:1000]}")
 
     results = []
     seen_ids = set()
@@ -70,11 +72,9 @@ def fetch_ads(page_id, page_name):
             continue
         seen_ids.add(ad_id)
 
-        # Convert unix timestamp to readable date
         start_ts = item.get("start_date")
         started = datetime.utcfromtimestamp(start_ts).strftime("%Y-%m-%d") if start_ts else ""
 
-        # Get ad text from snapshot cards
         snapshot = item.get("snapshot", {}) or {}
         cards = snapshot.get("cards", []) or []
         ad_text = cards[0].get("body", "") if cards else ""
@@ -92,6 +92,9 @@ def fetch_ads(page_id, page_name):
             "link_url": str(link_url),
             "started": started,
         })
+
+    print(f"Total unique ads: {len(results)}")
+    return results
 
 def write_to_sheet(rows):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
