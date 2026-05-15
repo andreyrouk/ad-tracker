@@ -13,6 +13,8 @@ SHEET_NAME = "Ad Tracker"
 
 COMPETITORS = {
     "LegalZoom": "96270063170",
+    "ZenBusiness": "271874619931367",
+    "Tailor Brands": "1457630347838190",
 }
 
 def fetch_ads(page_id, page_name):
