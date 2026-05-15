@@ -22,13 +22,14 @@ def fetch_ads(page_id, page_name):
 
     run_url = "https://api.apify.com/v2/acts/api_creators~facebook-ads-library-scraper-api/runs"
     headers = {"Authorization": f"Bearer {APIFY_TOKEN}"}
+    
     payload = {
         "start_urls": [
             {
                 "url": f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id={page_id}"
             }
         ],
-        "maxResults": 150,
+        "maxResults": 350,
     }
 
     run_response = requests.post(run_url, json=payload, headers=headers)
