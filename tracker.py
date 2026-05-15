@@ -64,25 +64,34 @@ def fetch_ads(page_id, page_name):
     results = []
     seen_ids = set()
 
-    for item in items:
-        ad_id = str(item.get("adArchiveId", item.get("id", "")))
+     for item in items:
+        ad_id = str(item.get("ad_archive_id", ""))
         if not ad_id or ad_id in seen_ids:
             continue
         seen_ids.add(ad_id)
+
+        # Convert unix timestamp to readable date
+        start_ts = item.get("start_date")
+        started = datetime.utcfromtimestamp(start_ts).strftime("%Y-%m-%d") if start_ts else ""
+
+        # Get ad text from snapshot cards
+        snapshot = item.get("snapshot", {}) or {}
+        cards = snapshot.get("cards", []) or []
+        ad_text = cards[0].get("body", "") if cards else ""
+        title = cards[0].get("title", "") if cards else ""
+        cta = snapshot.get("cta_text", "")
+        link_url = cards[0].get("link_url", "") if cards else ""
 
         results.append({
             "ad_id": ad_id,
             "competitor": page_name,
             "date_seen": datetime.today().strftime("%Y-%m-%d"),
-            "ad_text": str(item.get("adText", item.get("body", "")))[:300],
-            "title": str(item.get("title", "")),
-            "cta": str(item.get("ctaText", item.get("cta", ""))),
-            "link_url": str(item.get("linkUrl", item.get("url", ""))),
-            "started": str(item.get("startDate", item.get("adDeliveryStartTime", ""))),
+            "ad_text": str(ad_text)[:300],
+            "title": str(title),
+            "cta": str(cta),
+            "link_url": str(link_url),
+            "started": started,
         })
-
-    print(f"Total unique ads: {len(results)}")
-    return results
 
 def write_to_sheet(rows):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
